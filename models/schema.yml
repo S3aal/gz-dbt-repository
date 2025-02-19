@@ -1,0 +1,245 @@
+version: 2
+
+# Existing sources configuration
+sources:
+  - name: raw
+    schema: gz_raw_data
+    tables:
+      - name: sales
+        identifier: raw_gz_sales
+        description: "Sales data containing orders and products"
+        loaded_at_field: date_date
+        columns:
+          - name: date_date
+            description: "The date when the sale occurred"
+            tests:
+              - not_null
+          - name: orders_id
+            description: "Unique identifier for each order"
+            tests:
+              - not_null
+          - name: pdt_id
+            description: "Unique identifier for each product"
+            tests:
+              - not_null
+          - name: revenue
+            description: "Total revenue generated from the sale"
+            tests:
+              - not_null
+          - name: quantity
+            description: "Number of products sold in the order"
+            tests:
+              - not_null
+      - name: product  
+        identifier: raw_gz_product
+        description: "Product data containing product prices"
+        columns:
+          - name: products_id
+            description: "Unique identifier for each product"
+            tests:
+              - not_null
+          - name: purchSE_PRICE  
+            description: "Purchase price for each product"
+            tests:
+              - not_null
+      - name: ship
+        identifier: raw_gz_ship
+        description: "Shipping cost and fee data"
+        columns:
+          - name: orders_id
+            description: "Order identifier for shipping details"
+            tests:
+              - not_null
+          - name: shipping_fee
+            description: "Shipping fee charged"
+            tests:
+              - not_null
+          - name: ship_cost
+            description: "Shipping cost incurred"
+            tests:
+              - not_null
+          - name: logCost
+            description: "Logistical cost"
+            tests:
+              - not_null
+
+# Models Configuration
+models:
+  - name: stg_sales
+    description: "Staging model for sales transaction data."
+    columns:
+      - name: orders_id
+        description: "Unique identifier for each order."
+        tests:
+          - not_null
+      - name: date_date
+        description: "The date of the sale."
+        tests:
+          - not_null
+      - name: products_id  # Derived from raw_gz_product via aliasing
+        description: "Identifier for the product."
+        tests:
+          - not_null
+      - name: quantity
+        description: "Quantity of items in the order."
+        tests:
+          - not_null
+      - name: revenue
+        description: "Total revenue generated from the order."
+        tests:
+          - not_null
+      - name: is_unique  # Computed column to mark uniqueness of orders
+        description: "Indicates if the order is unique for the date."
+        tests:
+          - not_null
+
+  # Intermediate Models
+  - name: int_orders_margin
+    description: "Margin calculation per order."
+    columns:
+      - name: orders_id
+        description: "Primary key."
+        tests:
+          - unique
+          - not_null
+      - name: margin
+        description: "Margin = revenue - purchase_cost."
+        tests:
+          - not_null
+      - name: purchase_cost
+        description: "Purchase cost = quantity * purchase_price."
+        tests:
+          - not_null
+      - name: date_date
+        description: "Date of the order."
+        tests:
+          - not_null
+      - name: revenue
+        description: "Total revenue per order."
+        tests:
+          - not_null
+      - name: quantity
+        description: "Total quantity per order."
+        tests:
+          - not_null
+
+  - name: int_sales_margin
+    description: "Margin calculation per order line / product sales."
+    columns:
+      - name: orders_id
+        description: "Order key."
+        tests:
+          - not_null
+      - name: products_id
+        description: "Product key."
+        tests:
+          - not_null
+      - name: margin
+        description: "Margin = revenue - purchase_cost."
+        tests:
+          - not_null
+      - name: purchase_cost
+        description: "Purchase cost = quantity * purchase_price."
+        tests:
+          - not_null
+      - name: date_date
+        description: "Date of the order."
+        tests:
+          - not_null
+      - name: revenue
+        description: "Total revenue per order."
+        tests:
+          - not_null
+      - name: quantity
+        description: "Total quantity per order."
+        tests:
+          - not_null
+    tests:
+      - unique:
+          column_name: "(orders_id || '-' || products_id)"
+
+  - name: int_orders_operational
+    description: "Operational margin calculation per order."
+    columns:
+      - name: orders_id
+        description: "Primary key."
+        tests:
+          - unique
+          - not_null
+      - name: date_date
+        description: "Date of the order."
+        tests:
+          - not_null
+      - name: operational_margin
+        description: "Operational margin = margin + shipping_fee - logcost - ship_cost."
+      - name: quantity
+        description: "Total quantity per order."
+        tests:
+          - not_null
+      - name: revenue
+        description: "Total revenue per order."
+        tests:
+          - not_null
+      - name: purchase_cost
+        description: "Purchase cost = quantity * purchase_price."
+        tests:
+          - not_null
+      - name: margin
+        description: "Margin = revenue - purchase_cost."
+        tests:
+          - not_null
+      - name: shipping_fee
+        description: "Shipping fee charged to the customer."
+      - name: logcost
+        description: "Logistical cost of preparing the parcel."
+      - name: ship_cost
+        description: "Shipping cost paid by Greenweez to the carrier."
+
+  # Finance Aggregations
+  - name: finance_days
+    description: "Aggregates daily financial data including total revenue, costs, and margins."
+    columns:
+      - name: date_date
+        description: "The date of the transactions."
+        tests:
+          - not_null
+      - name: nb_transactions
+        description: "The number of transactions on the given day."
+        tests:
+          - not_null
+      - name: revenue
+        description: "Total revenue for the day."
+        tests:
+          - not_null
+      - name: average_basket
+        description: "Average basket size, calculated as revenue divided by the number of transactions."
+        tests:
+          - not_null
+      - name: margin
+        description: "Total margin for the day."
+        tests:
+          - not_null
+      - name: operational_margin
+        description: "Operational margin for the day."
+        tests:
+          - not_null
+      - name: purchase_cost
+        description: "Total purchase cost for the day."
+        tests:
+          - not_null
+      - name: shipping_fee
+        description: "Total shipping fees for the day."
+        tests:
+          - not_null
+      - name: logcost
+        description: "Total logistics costs for the day."
+        tests:
+          - not_null
+      - name: ship_cost
+        description: "Total shipping costs for the day."
+        tests:
+          - not_null
+      - name: quantity
+        description: "Total quantity of items sold on the day."
+        tests:
+          - not_null
