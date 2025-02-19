@@ -17,6 +17,10 @@ shipping_data AS (
 SELECT 
     o.orders_id,
     o.date_date,
+    o.margin,  -- Include margin column
+    o.purchase_cost,  -- Include purchase_cost column (if it exists in int_orders_margin)
+    o.quantity,  -- Include quantity column (if it exists in int_orders_margin)
+    o.revenue,  -- Include revenue column (if it exists in int_orders_margin)
     (o.margin + s.shipping_fee - s.logCost - s.ship_cost) AS operational_margin
 FROM orders_margin AS o
 LEFT JOIN shipping_data AS s
